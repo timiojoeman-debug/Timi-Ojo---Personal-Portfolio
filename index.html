@@ -100,8 +100,8 @@ nav.top{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;d
 /* The warp: the screen's glow breaks into streaks of 0s and 1s */
 .warp{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0}
 /* "I build to learn." is written on the laptop screen: JS maps this 1000px block onto the screen's rectangle, frame by frame */
-.b6{left:0;top:0;width:1000px;transform-origin:0 0;text-align:center}
-.b6 .h-band{font-size:112px}
+.band.b6{left:0;right:auto;top:0;bottom:auto;width:1000px;transform-origin:0 0;text-align:center}   /* two classes: the small-screen caption rule must never move it off the laptop */
+.b6 .h-band{font-size:112px;white-space:nowrap}
 .b6 .sub{font-size:34px;margin:18px auto 0;max-width:none}
 /* Glitch: gold and black slices tear across a headline as it arrives */
 .glitch{position:relative}
