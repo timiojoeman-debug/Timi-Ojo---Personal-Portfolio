@@ -1008,6 +1008,37 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     const pr = video.play();
     if (pr && pr.then) pr.then(() => { video.pause(); seekHere(); }, seekHere); else { video.pause(); seekHere(); }
   }
+  // ?debug shows a live readout of the hero video, for diagnosing devices we cannot attach a debugger to
+  if (/[?&]debug\b/.test(location.search)) {
+    const box = document.createElement('pre');
+    box.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:999;margin:0;padding:8px 10px;max-width:calc(100% - 12px);font:11px/1.35 ui-monospace,monospace;color:#F2EDE3;background:rgba(0,0,0,.82);border:1px solid #D8B25A;border-radius:8px;pointer-events:none;white-space:pre-wrap';
+    document.body.appendChild(box);
+    const log = [], counts = { seekReq: 0, seeked: 0 };
+    const t0 = performance.now(), stamp = () => ((performance.now() - t0) / 1000).toFixed(1);
+    ['loadedmetadata', 'canplay', 'play', 'pause', 'seeking', 'seeked', 'waiting', 'stalled', 'suspend', 'emptied', 'abort', 'error'].forEach(ev =>
+      video.addEventListener(ev, () => {
+        if (ev === 'seeked') counts.seeked++;
+        if (ev === 'seeking' || ev === 'seeked') return;
+        const last = log[log.length - 1];
+        if (last && last.ev === ev) { last.n++; last.at = stamp(); return; }   // repeats collapse into one line with a count
+        log.push({ ev, n: 1, at: stamp() }); if (log.length > 6) log.shift();
+      }));
+    const origSeek = requestSeek;
+    requestSeek = t => { counts.seekReq++; origSeek(t); };
+    document.addEventListener('visibilitychange', () => { log.push({ ev: 'tab ' + (document.hidden ? 'hidden' : 'visible'), n: 1, at: stamp() }); if (log.length > 6) log.shift(); });
+    let lastFrame = 0;
+    if ('requestVideoFrameCallback' in video) { const f = () => { lastFrame = performance.now(); video.requestVideoFrameCallback(f); }; video.requestVideoFrameCallback(f); }
+    setInterval(() => {
+      const target = video.duration ? shown * (video.duration - 0.04) : 0;
+      box.textContent =
+        `ready ${video.readyState} net ${video.networkState} paused ${video.paused} seeking ${video.seeking}\n` +
+        `t ${video.currentTime.toFixed(2)} target ${target.toFixed(2)} dur ${(video.duration || 0).toFixed(2)}\n` +
+        `seekBusy ${seekBusy} age ${seekBusy ? Math.round(performance.now() - seekAt) : 0}ms  req ${counts.seekReq} done ${counts.seeked}\n` +
+        `painted ${stage.classList.contains('video-painted')} lastFrame ${lastFrame ? Math.round(performance.now() - lastFrame) + 'ms ago' : 'n/a'}\n` +
+        `vOp ${getComputedStyle(video).opacity} posterOp ${getComputedStyle(poster).opacity} onScreen ${heroOnScreen} p ${shown.toFixed(3)}\n` +
+        `err ${video.error ? video.error.code : '-'} src ${video.currentSrc ? 'blob' : 'none'}\n` + log.map(l => `${l.at} ${l.ev}${l.n > 1 ? ' x' + l.n : ''}`).join('\n');
+    }, 250);
+  }
   // Low Power Mode blocks the silent play above; a touch is a user gesture, so retry on touch until a frame shows
   addEventListener('touchstart', function retry() {
     if (stage.classList.contains('video-painted')) { removeEventListener('touchstart', retry); return; }
