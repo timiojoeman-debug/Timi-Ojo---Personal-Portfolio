@@ -75,7 +75,7 @@ nav.top{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;d
 
 /* Hero: tall pinned scrub */
 .hero{position:relative;height:1000vh}
-.stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;background:#0A0805}
+.stage{position:sticky;top:0;height:100vh;height:100lvh;overflow:hidden;background:#0A0805}
 .poster,.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .poster{background:#0A0805 center/cover no-repeat}
 .stage video{opacity:0;transition:opacity .8s var(--ease);will-change:transform;transform:translateZ(0)}
@@ -302,7 +302,7 @@ footer{border-top:1px solid var(--line);padding:30px clamp(16px,5vw,64px);displa
 /* Phones and portrait screens: the journey stays, captions move to the lower third */
 @media (max-width: 720px),(orientation: portrait) and (max-width: 1024px){
   .hero{height:880vh}
-  .band{left:16px;right:16px;width:auto;top:auto;bottom:max(64px,9vh);transform:none}
+  .band{left:16px;right:16px;width:auto;top:auto;bottom:calc(max(64px,9svh) + 100lvh - 100svh);transform:none}   /* lifted by the toolbar's height so it is never hidden under it */
   .band::before{inset:-40% -10% -20%;background:radial-gradient(ellipse 90% 70% at 50% 60%,rgba(8,6,3,.78) 0%,rgba(8,6,3,.5) 50%,rgba(8,6,3,0) 80%)}
   .bcard{width:auto}
   .card img{aspect-ratio:16/8}
