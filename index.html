@@ -80,6 +80,9 @@ nav.top{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;d
 .poster{background:#0A0805 center/cover no-repeat}
 .stage video{opacity:0;transition:opacity .8s var(--ease);will-change:transform;transform:translateZ(0)}
 .stage.video-painted video{opacity:1}
+.stage .frames{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .8s var(--ease)}
+.stage.video-painted .frames{opacity:1}
+.stage.frames-mode video{display:none}
 .stage.video-painted .poster{opacity:0;transition:opacity .3s 1s}   /* only once a real frame is on screen: never black, and the door never ghosts through later */
 .stage.video-failed video{display:none}
 .scrim{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 120% 90% at 60% 45%,rgba(10,8,5,0) 35%,rgba(10,8,5,.6) 100%),linear-gradient(to bottom,rgba(10,8,5,.45),transparent 22%)}
@@ -722,6 +725,11 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   const VIDEO_URL = MOBILE_FILE ? 'assets/hero-scrub-m.mp4' : 'assets/hero-scrub.mp4';
   const POSTER_URL = MOBILE_FILE ? 'assets/hero-poster-m.jpg' : 'assets/hero-poster.jpg';
   const VIDEO_BYTES = MOBILE_FILE ? 2187651 : 8673231;   // fallback when Content-Length is missing
+  const DUR = 19.75;   // the film's length: frames and video run on one clock
+  // Touch devices draw a frame sequence on a canvas instead: Safari's video seeking can stall and leave the hero black, a canvas keeps its last picture
+  const FRAMES = matchMedia('(pointer: coarse)').matches || SMALL.matches;
+  const FRAME_COUNT = 296, FPS = 15;
+  let frameCanvas = null, media = video;
   let target = 0, shown = 0, rafId = null, lastTick = 0, heroOnScreen = true, scrubOn = false, inited = false;
   let loadK = 0; const loadStart = performance.now();
 
@@ -859,10 +867,12 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     wctx.fillStyle = core; wctx.fillRect(0, 0, wW, wH);
     warpRaf = requestAnimationFrame(warpFrame);
   }
-  let lastClear = -1;
+  let lastClear = -1, lastVop = null;
   function applyWarp(p) {
     const op = Math.round(smoothstep(p, W_ON, 0.9) * (1 - smoothstep(p, 0.955, 0.985)) * 1000) / 1000;
-    if (op !== lastWarpOp) { lastWarpOp = op; warp.style.opacity = op; video.style.opacity = stage.classList.contains('video-painted') ? 1 - smoothstep(p, W_ON, 0.9) : ''; }
+    if (op !== lastWarpOp) { lastWarpOp = op; warp.style.opacity = op; }
+    const vop = stage.classList.contains('video-painted') ? String(Math.round((1 - smoothstep(p, W_ON, 0.9)) * 1000) / 1000) : '';
+    if (vop !== lastVop) { lastVop = vop; media.style.opacity = vop; }   // its own cache: the warp is 0 both before and after, the film is not
     // the last stretch: the room's black lifts and the warp settles into the page's binary field
     const clr = Math.round(smoothstep(p, 0.985, 1) * 1000) / 1000;
     if (clr !== lastClear) { lastClear = clr; stage.style.backgroundColor = `rgba(10,8,5,${1 - clr})`; fieldWanted(clr > 0); }
@@ -884,7 +894,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   const SCREEN = [[0, .214, .522, .446, .794], [.75, .211, .515, .451, .794], [1, .209, .506, .458, .794], [1.25, .205, .487, .471, .798], [1.5, .201, .465, .486, .800], [1.75, .193, .439, .505, .804], [2, .184, .407, .530, .813], [2.25, .174, .372, .557, .826], [2.5, .159, .331, .591, .844], [2.75, .142, .281, .630, .865], [3, .119, .220, .676, .894], [3.25, .085, .148, .733, .937], [3.5, .042, .063, .799, .993], [3.75, -.011, -.033, .875, 1.061], [4, -.075, -.140, .962, 1.140], [4.5, -.244, -.405, 1.176, 1.345]];
   const SHOT3 = 13.168;   // shot 3 starts here in the joined film
   const onScreen = $('.b6');
-  let lastScreenT = '', lastCrop = -1;
+  let lastScreenT = '', lastCrop = -1, cropF = 0.5;
   // On a narrow screen the cover crop only shows the middle of the frame, so near the end it slides toward the laptop. Returns the crop fraction (0.5 = centred).
   function applyCrop(p, focusX, W, sc) {
     let cf = 0.5;
@@ -894,11 +904,11 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
       cf = 0.5 + (want - 0.5) * smoothstep(p, 0.6, 0.7);
     }
     const v = Math.round(cf * 1000) / 10;
-    if (v !== lastCrop) { lastCrop = v; video.style.objectPosition = v + '% 50%'; }
+    if (v !== lastCrop) { lastCrop = v; cropF = cf; if (FRAMES) drawFrame(true); else video.style.objectPosition = v + '% 50%'; }
     return cf;
   }
   function placeOnScreen(p) {
-    const t = clamp(p * ((video.duration || 19.75) - 0.04) - SHOT3, 0, 4.5);
+    const t = clamp(p * (DUR - 0.04) - SHOT3, 0, 4.5);
     let i = 0; while (i < SCREEN.length - 2 && t > SCREEN[i + 1][0]) i++;
     const A = SCREEN[i], B = SCREEN[i + 1], f = clamp((t - A[0]) / (B[0] - A[0]), 0, 1);
     const r = [1, 2, 3, 4].map(j => A[j] + (B[j] - A[j]) * f);
@@ -929,19 +939,21 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     applyDoor(p);
     applyWarp(p);
     if (p > 0.58 && p < 0.92) placeOnScreen(p);
-    else if (lastCrop !== 50) { lastCrop = 50; video.style.objectPosition = '50% 50%'; }
+    else if (lastCrop !== 50) { lastCrop = 50; cropF = 0.5; if (FRAMES) drawFrame(true); else video.style.objectPosition = '50% 50%'; }
   }
 
   function tick(now) {
+    if (!heroOnScreen) { rafId = null; lastTick = 0; return; }   // the film is off screen: nothing to scrub
     const dt = Math.min(100, now - (lastTick || now)); lastTick = now;
     if (loadK < 1) loadK = clamp((now - loadStart - 250) / 1100, 0, 1);
     const k = 0.14;
     shown += (target - shown) * (1 - Math.pow(1 - k, dt / 16.667));
     if (Math.abs(target - shown) < 0.0004 && loadK >= 1) { shown = target; rafId = null; lastTick = 0; }
     else rafId = requestAnimationFrame(tick);
-    if (video.duration) requestSeek(shown * (video.duration - 0.04));
+    scrubTo(shown);
     updateCaptions(shown);
   }
+  function scrubTo(p) { if (FRAMES) showFrame(p); else if (video.duration) requestSeek(p * (video.duration - 0.04)); }
   function onScroll() {
     target = heroProgress();
     if (rafId === null && heroOnScreen && scrubOn) rafId = requestAnimationFrame(tick);
@@ -950,7 +962,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   new IntersectionObserver(([e]) => {
     heroOnScreen = e.isIntersecting;
     root.classList.toggle('past-hero', !heroOnScreen);
-    if (heroOnScreen) { if (heroWasAway && scrubOn && video.duration) primeVideo(); onScroll(); }   // Safari may have dropped the frame while the film was off screen
+    if (heroOnScreen) { onScroll(); if (heroWasAway && scrubOn && !FRAMES && video.duration) primeVideo(); }   // Safari may have dropped the frame while the film was off screen
     heroWasAway = !heroOnScreen;
     syncField();
   }).observe(hero);
@@ -964,16 +976,18 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     if (Math.min(scrollY, to) < heroEnd && Math.max(scrollY, to) > hero.offsetTop + innerHeight) {
       e.preventDefault();
       scrollTo({ top: Math.max(0, to), behavior: 'instant' });
+      if (scrubOn) { target = shown = heroProgress(); scrubTo(shown); updateCaptions(shown); }   // land on the new frame at once, no sweep back through the film
       history.pushState(null, '', a.getAttribute('href'));
       (el.matches('main, section, header') ? el : document.body).focus?.({ preventScroll: true });
     }
   });
   let rsT = null;
-  addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { sizeField(); if (!scrubOn) return; sizeWarp(); sizeMark(); }, 150); });
+  addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { sizeField(); if (!scrubOn) return; sizeWarp(); sizeMark(); if (FRAMES && frameCanvas) sizeFrames(); }, 150); });
 
   function failVideo() {
     ring.style.display = 'none';
     cueLabel.textContent = 'Scroll';
+    stage.classList.remove('video-painted');   // never leave both the poster and the film hidden
     stage.classList.add('video-failed');
   }
   async function loadHeroBlob() {
@@ -1000,13 +1014,79 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   }
   // iPhone Safari never draws a seeked frame of a video that has not played, so play a beat, pause, then seek.
   // The poster stays up until a real frame is confirmed on screen.
-  function markPainted() { if (stage.classList.contains('video-painted')) return; stage.classList.add('video-painted'); lastWarpOp = -1; applyWarp(shown); }
+  function markPainted() { if (stage.classList.contains('video-painted')) return; stage.classList.add('video-painted'); lastVop = null; applyWarp(shown); }
+  let priming = false, primeGen = 0;
   function primeVideo() {
-    if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(markPainted);
-    else video.addEventListener('seeked', markPainted, { once: true });
-    const seekHere = () => { seekBusy = false; pendingTime = null; requestSeek(shown * (video.duration - 0.04)); };
+    if (FRAMES || priming || !video.duration) return;
+    priming = true;
+    const gen = ++primeGen, painted = () => { if (gen === primeGen) markPainted(); };
+    if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(painted);
+    else video.addEventListener('seeked', painted, { once: true });
+    const seekHere = () => { priming = false; seekBusy = false; pendingTime = null; requestSeek(shown * (video.duration - 0.04)); };
     const pr = video.play();
     if (pr && pr.then) pr.then(() => { video.pause(); seekHere(); }, seekHere); else { video.pause(); seekHere(); }
+  }
+  // Watchdog, independent of scrolling: free a seek that never reported back, and bring the poster back if the video lost its frame
+  setInterval(() => {
+    if (FRAMES || !scrubOn || !heroOnScreen || !video.duration || document.hidden) return;
+    if (seekBusy && performance.now() - seekAt > 800) { seekBusy = false; const t = pendingTime; pendingTime = null; requestSeek(t !== null ? t : shown * (video.duration - 0.04)); }
+    if (stage.classList.contains('video-painted') && video.readyState < 2) { stage.classList.remove('video-painted'); lastVop = null; applyWarp(shown); primeVideo(); }
+  }, 500);
+
+  /* ---------- touch devices: a frame sequence on a canvas ---------- */
+  const frames = new Array(FRAME_COUNT);
+  let fctxH = null, framesLoaded = 0, drawnIdx = -1, wantIdx = 0, fcW = 0, fcH = 0;
+  function sizeFrames() {
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    fcW = Math.round(stage.clientWidth * dpr); fcH = Math.round(stage.clientHeight * dpr);
+    frameCanvas.width = fcW; frameCanvas.height = fcH;
+    drawFrame(true);
+  }
+  function showFrame(p) { wantIdx = clamp(Math.round(p * (DUR - 0.04) * FPS), 0, FRAME_COUNT - 1); drawFrame(false); }
+  function drawFrame(force) {
+    if (!fctxH || !fcW) return;
+    let idx = -1;
+    for (let d = 0; d < FRAME_COUNT; d++) {   // the nearest frame that has arrived; the canvas keeps the old picture until one has
+      if (frames[wantIdx - d]) { idx = wantIdx - d; break; }
+      if (frames[wantIdx + d]) { idx = wantIdx + d; break; }
+    }
+    if (idx < 0 || (idx === drawnIdx && !force)) return;
+    const img = frames[idx], sc = Math.max(fcW / img.naturalWidth, fcH / img.naturalHeight), dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
+    try { fctxH.drawImage(img, (fcW - dw) * cropF, (fcH - dh) / 2, dw, dh); } catch (e) { return; }
+    drawnIdx = idx;
+    markPainted();
+  }
+  function loadFrames() {
+    frameCanvas = document.createElement('canvas');
+    frameCanvas.className = 'frames'; frameCanvas.setAttribute('aria-hidden', 'true');
+    video.after(frameCanvas);
+    stage.classList.add('frames-mode');
+    media = frameCanvas; fctxH = frameCanvas.getContext('2d');
+    sizeFrames();
+    // every 8th frame first so the whole journey can be scrubbed almost at once, then fill the gaps
+    const order = [], seen = new Set();
+    for (const step of [8, 4, 2, 1]) for (let i = 0; i < FRAME_COUNT; i += step) if (!seen.has(i)) { seen.add(i); order.push(i); }
+    const coarse = Math.ceil(FRAME_COUNT / 8);
+    return new Promise((resolve, reject) => {
+      let next = 0, active = 0;
+      const pump = () => {
+        while (active < 6 && next < order.length) {
+          const i = order[next++], img = new Image();
+          active++;
+          img.decoding = 'async';
+          img.onload = () => {
+            frames[i] = img; framesLoaded++; active--;
+            if (framesLoaded <= coarse) { const f = framesLoaded / coarse; ring.style.setProperty('--ld', Math.round(126 * (1 - f))); cueLabel.textContent = f < 1 ? 'Loading ' + Math.round(f * 100) + '%' : 'Scroll to open'; }
+            if (Math.abs(i - wantIdx) < 8) drawFrame(false);
+            pump();
+          };
+          img.onerror = () => { active--; pump(); };
+          img.src = 'assets/frames/f' + String(i + 1).padStart(3, '0') + '.webp';
+        }
+        if (active === 0 && next >= order.length) { if (framesLoaded) resolve(); else reject(new Error('no frames')); }
+      };
+      pump();
+    });
   }
   // ?debug shows a live readout of the hero video, for diagnosing devices we cannot attach a debugger to
   if (/[?&]debug\b/.test(location.search)) {
@@ -1030,7 +1110,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     if ('requestVideoFrameCallback' in video) { const f = () => { lastFrame = performance.now(); video.requestVideoFrameCallback(f); }; video.requestVideoFrameCallback(f); }
     setInterval(() => {
       const target = video.duration ? shown * (video.duration - 0.04) : 0;
-      box.textContent =
+      box.textContent = (FRAMES ? `FRAMES ${framesLoaded}/${FRAME_COUNT} want ${wantIdx} drawn ${drawnIdx} crop ${cropF.toFixed(2)} canvas ${fcW}x${fcH}\n` : '') +
         `ready ${video.readyState} net ${video.networkState} paused ${video.paused} seeking ${video.seeking}\n` +
         `t ${video.currentTime.toFixed(2)} target ${target.toFixed(2)} dur ${(video.duration || 0).toFixed(2)}\n` +
         `seekBusy ${seekBusy} age ${seekBusy ? Math.round(performance.now() - seekAt) : 0}ms  req ${counts.seekReq} done ${counts.seeked}\n` +
@@ -1042,13 +1122,13 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   // Low Power Mode blocks the silent play above; a touch is a user gesture, so retry on touch until a frame shows
   addEventListener('touchstart', function retry() {
     if (stage.classList.contains('video-painted')) { removeEventListener('touchstart', retry); return; }
-    if (video.duration) primeVideo();
+    if (!FRAMES && video.duration) primeVideo();
   }, { passive: true });
   function initHeroOnce() {
     if (inited) return; inited = true;
     poster.style.backgroundImage = `url('${POSTER_URL}')`;
     let started = false;
-    const start = () => { if (started) return; started = true; loadHeroBlob().catch(failVideo); };
+    const start = () => { if (started) return; started = true; (FRAMES ? loadFrames() : loadHeroBlob()).catch(failVideo); };
     const img = new Image(); img.onload = start; img.onerror = start; img.src = POSTER_URL;
     setTimeout(start, 4000);
   }
@@ -1065,7 +1145,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     initHeroOnce();
     addEventListener('scroll', onScroll, { passive: true });
     bands.forEach(b => { b.op = -1; b.k = -1; });
-    lastM = lastWarpOp = lastClear = -1;
+    lastM = lastWarpOp = lastClear = -1; lastVop = null;
     unpinFinalStates();
     sizeWarp(); sizeMark();
     shown = target = heroProgress();
@@ -1198,7 +1278,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('menu-open')) setMenu(false, true); });
   matchMedia('(max-width: 720px)').addEventListener('change', e => { if (!e.matches && root.classList.contains('menu-open')) setMenu(false, false); });
 
-  document.addEventListener('visibilitychange', () => { document.body.classList.toggle('paused', document.hidden); if (!document.hidden && scrubOn) { applyWarp(shown); if (video.duration) primeVideo(); } syncField(); });   // Safari can drop the decoded frame while the tab is hidden
+  document.addEventListener('visibilitychange', () => { document.body.classList.toggle('paused', document.hidden); if (!document.hidden && scrubOn) { applyWarp(shown); if (!FRAMES && video.duration) primeVideo(); } syncField(); });   // Safari can drop the decoded frame while the tab is hidden
 
   applyHeroMode();
   if (reduced.matches) pinToFinalStates();
