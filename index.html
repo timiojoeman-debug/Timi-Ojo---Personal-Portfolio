@@ -870,11 +870,12 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   }
 
   let seekBusy = false, pendingTime = null;
+  let seekAt = 0;
   function requestSeek(t) {
     if (!video.duration || !isFinite(video.duration)) return;
-    if (seekBusy) { pendingTime = t; return; }
-    if (Math.abs(video.currentTime - t) < 0.001) return;
-    seekBusy = true; video.currentTime = t;
+    if (seekBusy && performance.now() - seekAt < 800) { pendingTime = t; return; }   // a seek that never reports back (Safari, under a burst) stops blocking after 0.8s
+    if (Math.abs(video.currentTime - t) < 0.001) { seekBusy = false; return; }
+    seekBusy = true; seekAt = performance.now(); pendingTime = null; video.currentTime = t;
   }
   video.addEventListener('seeked', () => { seekBusy = false; if (pendingTime !== null) { const t = pendingTime; pendingTime = null; requestSeek(t); } });
   video.addEventListener('error', () => { seekBusy = false; pendingTime = null; failVideo(); });
@@ -945,7 +946,28 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     target = heroProgress();
     if (rafId === null && heroOnScreen && scrubOn) rafId = requestAnimationFrame(tick);
   }
-  new IntersectionObserver(([e]) => { heroOnScreen = e.isIntersecting; root.classList.toggle('past-hero', !heroOnScreen); if (heroOnScreen) onScroll(); syncField(); }).observe(hero);
+  let heroWasAway = false;
+  new IntersectionObserver(([e]) => {
+    heroOnScreen = e.isIntersecting;
+    root.classList.toggle('past-hero', !heroOnScreen);
+    if (heroOnScreen) { if (heroWasAway && scrubOn && video.duration) primeVideo(); onScroll(); }   // Safari may have dropped the frame while the film was off screen
+    heroWasAway = !heroOnScreen;
+    syncField();
+  }).observe(hero);
+  // Jumps that would sweep through the film happen instantly: smooth-scrolling 1000vh fires a storm of seeks and shows nothing worth seeing
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || a.getAttribute('href').length < 2) return;
+    const el = document.querySelector(a.getAttribute('href'));
+    if (!el) return;
+    const heroEnd = hero.offsetTop + hero.offsetHeight, to = el.getBoundingClientRect().top + scrollY - (el === hero ? 0 : 96);
+    if (Math.min(scrollY, to) < heroEnd && Math.max(scrollY, to) > hero.offsetTop + innerHeight) {
+      e.preventDefault();
+      scrollTo({ top: Math.max(0, to), behavior: 'instant' });
+      history.pushState(null, '', a.getAttribute('href'));
+      (el.matches('main, section, header') ? el : document.body).focus?.({ preventScroll: true });
+    }
+  });
   let rsT = null;
   addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { sizeField(); if (!scrubOn) return; sizeWarp(); sizeMark(); }, 150); });
 
