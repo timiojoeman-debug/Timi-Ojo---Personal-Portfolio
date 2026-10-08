@@ -369,6 +369,7 @@ html.static .static-hero .row{display:flex;flex-wrap:wrap;gap:12px;margin-top:28
   .tl-line{transform:none}
 }
 body.paused *,body.paused *::before,body.paused *::after{animation-play-state:paused!important}
+html.og nav.top,html.og .cue{display:none}   /* ?og: clean frame for rendering the link-preview image */
 </style>
 </head>
 <body>
@@ -716,15 +717,16 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
 
   /* ---------- hero scrub ---------- */
   const root = document.documentElement;
+  if (/[?&]og(&|=|$)/.test(location.search)) root.classList.add('og');
   const stage = $('#stage'), video = $('#hero'), poster = $('#poster'), ring = $('#ring'), cue = $('#cue');
   const mark = $('#mark'), warp = $('#warp'), cueLabel = $('#cue-label'), field = $('#field');
   const hero = $('.hero');
   const bands = $$('.band').map((el, i, all) => ({ el, a: +el.dataset.a, b: +el.dataset.b, first: +el.dataset.a === 0, last: i === all.length - 1, op: -1, k: -1, ramp: +el.dataset.ramp || 0, decs: decoders.filter(d => el.contains(d.el)), live: false }));
   const SMALL = matchMedia('(max-width: 720px), (orientation: portrait) and (max-width: 1024px)');
   const MOBILE_FILE = SMALL.matches;   // decided once, so a rotation never re-downloads
-  const VIDEO_URL = MOBILE_FILE ? 'assets/hero-scrub-m.mp4' : 'assets/hero-scrub.mp4';
+  const VIDEO_URL = 'assets/hero-scrub.mp4';   // desktop only: touch devices and small screens use the frame sequence
   const POSTER_URL = MOBILE_FILE ? 'assets/hero-poster-m.jpg' : 'assets/hero-poster.jpg';
-  const VIDEO_BYTES = MOBILE_FILE ? 2187651 : 8673231;   // fallback when Content-Length is missing
+  const VIDEO_BYTES = 8673231;   // fallback when Content-Length is missing
   const DUR = 19.75;   // the film's length: frames and video run on one clock
   // Touch devices draw a frame sequence on a canvas instead: Safari's video seeking can stall and leave the hero black, a canvas keeps its last picture
   const FRAMES = matchMedia('(pointer: coarse)').matches || SMALL.matches;
