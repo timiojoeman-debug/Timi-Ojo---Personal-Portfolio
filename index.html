@@ -51,6 +51,20 @@ nav.top{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;d
 .nav-links{display:flex;gap:2px}
 .nav-links a{font:500 14px/1 var(--body);color:var(--text-2);text-decoration:none;padding:10px 12px;border-radius:999px;transition:color .3s var(--ease),background .3s var(--ease)}
 .nav-links a:hover{color:var(--text);background:rgba(242,237,227,.06)}
+/* Phone menu: a slim header, and a full-screen overlay that wipes open from the button */
+.menu-btn{display:none}
+.menu{position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;justify-content:space-between;gap:32px;padding:104px 24px max(32px,env(safe-area-inset-bottom));background:radial-gradient(ellipse 90% 50% at 100% 0%,rgba(216,178,90,.14),transparent 70%),var(--canvas);overflow-y:auto;visibility:hidden;clip-path:circle(0 at calc(100% - 38px) 38px);transition:clip-path .6s var(--ease-io),visibility 0s .6s}
+.menu-open .menu{visibility:visible;clip-path:circle(150% at calc(100% - 38px) 38px);transition:clip-path .75s var(--ease-io)}
+.menu-links{display:flex;flex-direction:column}
+.menu-links a{display:flex;align-items:baseline;gap:16px;padding:14px 0;border-bottom:1px solid var(--line);text-decoration:none;color:var(--text);overflow:hidden}
+.menu-links .mn{font:500 12px/1 var(--mono);letter-spacing:.14em;color:var(--accent);opacity:0;transition:opacity .4s var(--ease)}
+.menu-links .ml{display:inline-block;padding:.08em 0;font:700 clamp(38px,11vw,60px)/1 var(--display);letter-spacing:-.035em;transform:translateY(115%);transition:transform .45s var(--ease),color .3s var(--ease)}
+.menu-links a:hover .ml,.menu-links a:focus-visible .ml{color:var(--accent-hover)}
+.menu-open .menu-links .ml{transform:none;transition:transform .8s var(--ease) calc(.22s + var(--i)*.07s),color .3s var(--ease)}
+.menu-open .menu-links .mn{opacity:1;transition:opacity .6s var(--ease) calc(.4s + var(--i)*.07s)}
+.menu-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;opacity:0;transform:translateY(16px);transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.menu-open .menu-foot{opacity:1;transform:none;transition:opacity .6s var(--ease) .7s,transform .6s var(--ease) .7s}
+.menu-social{display:flex;gap:10px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:500 15px/1 var(--body);text-decoration:none;padding:13px 20px;border-radius:999px;border:1px solid transparent;cursor:pointer;transition:background .35s var(--ease),color .35s var(--ease),border-color .35s var(--ease),transform .35s var(--ease);text-shadow:none;white-space:nowrap}
 .btn-gold{background:var(--accent);color:#120E06}
 .btn-gold:hover{background:var(--accent-hover);transform:translateY(-1px)}
@@ -326,6 +340,14 @@ html.static .static-hero .row{display:flex;flex-wrap:wrap;gap:12px;margin-top:28
 }
 @media (max-width:720px){
   .nav-links{display:none}
+  nav.top{top:0;left:0;right:0;transform:none;width:auto;max-width:none;justify-content:space-between;padding:14px 16px;border:0;border-radius:0;background:linear-gradient(rgba(10,8,5,.82),rgba(10,8,5,0));backdrop-filter:none;-webkit-backdrop-filter:none}
+  nav.top .btn-gold{display:none}
+  .menu-btn{display:grid;place-items:center;position:relative;width:46px;height:46px;border-radius:50%;border:1px solid var(--line-strong);background:rgba(14,11,7,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);cursor:pointer}
+  .menu-btn i{position:absolute;width:18px;height:1.5px;border-radius:2px;background:var(--accent);transition:transform .5s var(--ease)}
+  .menu-btn i:first-child{transform:translateY(-4px)}
+  .menu-btn i:last-child{transform:translate(3.6px,4px) scaleX(.6)}
+  .menu-open .menu-btn i:first-child{transform:rotate(45deg)}
+  .menu-open .menu-btn i:last-child{transform:rotate(-45deg)}
   .receipts{grid-template-columns:1fr}
   .receipt,.receipt+.receipt{padding:26px 0;border-right:0}
   .receipt+.receipt{border-top:1px solid var(--line)}
@@ -360,7 +382,24 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     <a href="#experience">Experience</a>
   </div>
   <a class="btn btn-gold btn-sm" href="mailto:timiojoeman@yahoo.com">Email me</a>
+  <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Open menu"><i></i><i></i></button>
 </nav>
+<div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Site menu" inert>
+  <nav class="menu-links" aria-label="Sections">
+    <a href="#work" style="--i:0"><span class="mn">01</span><span class="ml decode-menu">Work</span></a>
+    <a href="#ship" style="--i:1"><span class="mn">02</span><span class="ml decode-menu">How I ship</span></a>
+    <a href="#experience" style="--i:2"><span class="mn">03</span><span class="ml decode-menu">Experience</span></a>
+    <a href="#kit" style="--i:3"><span class="mn">04</span><span class="ml decode-menu">Toolkit</span></a>
+    <a href="#contact" style="--i:4"><span class="mn">05</span><span class="ml decode-menu">Contact</span></a>
+  </nav>
+  <div class="menu-foot">
+    <a class="btn btn-gold" href="mailto:timiojoeman@yahoo.com">Email me</a>
+    <div class="menu-social">
+      <a class="proof" href="https://github.com/timiojoeman-debug" target="_blank" rel="noopener">GitHub</a>
+      <a class="proof" href="https://www.linkedin.com/in/timi-ojo/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </div>
+</div>
 
 <header class="hero" id="top">
   <div class="stage" id="stage">
@@ -567,7 +606,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     </div>
   </section>
 
-  <section aria-labelledby="kit-h">
+  <section id="kit" aria-labelledby="kit-h">
     <div class="wrap reveal">
       <p class="eyebrow rv">Toolkit</p>
       <h2 class="h2 rv decode-in glitch" id="kit-h">Only what I've shipped with.</h2>
@@ -639,7 +678,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   $$('.split').forEach((el, i) => splitInto(el, i, false));
   // Decode headlines: the words stay for screen readers, and a visible copy resolves out of 0s, 1s and ASCII
   const SCRAMBLE = '0101010101<>/{}[]#*+=;:';
-  const decoders = $$('.decode, .decode-in').map(el => {
+  const decoders = $$('.decode, .decode-in, .decode-menu').map(el => {
     const text = el.textContent.trim();
     el.innerHTML = '';
     const sr = document.createElement('span'); sr.className = 'sr'; sr.textContent = text;
@@ -701,7 +740,8 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     const w1 = words[0].getBoundingClientRect().width, w2 = words[1].getBoundingClientRect().width;
     let ws = 100 * Math.min((dl - pad - edge) / w1, (W - dr - pad - edge) / w2);
     const stack = ws < H * 0.12;   // the door fills a narrow screen: stack the name over it instead
-    if (stack) ws = 100 * (W - edge * 2) / Math.max(w1, w2);
+    const wyPx = oy + 445 * s;
+    if (stack) ws = Math.min(100 * (W - edge * 2) / Math.max(w1, w2), (wyPx - 84) / 0.95);   // the top word clears the 76px phone header
     mark.classList.toggle('stacked', stack);
     mark.style.setProperty('--ws', Math.round(Math.min(ws, H * 0.42)) + 'px');
     mark.style.setProperty('--dl', Math.round(dl - pad) + 'px');
@@ -1066,6 +1106,27 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     tlLast = -1; drawTimeline();
   }
   reduced.addEventListener('change', e => { if (e.matches) { pinToFinalStates(); applyHeroMode(); } else applyHeroMode(); });
+
+  /* ---------- phone menu: full-screen overlay ---------- */
+  const menuBtn = $('#menu-btn'), menu = $('#menu');
+  const menuDecs = decoders.filter(d => d.el.classList.contains('decode-menu'));
+  const behindMenu = [$('main'), hero, $('footer')];
+  function setMenu(open, focusBack) {
+    root.classList.toggle('menu-open', open);
+    menuBtn.setAttribute('aria-expanded', open);
+    menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    menu.inert = !open;
+    behindMenu.forEach(el => { if (el) el.inert = open; });
+    root.style.overflow = open ? 'hidden' : '';
+    if (open) {
+      menuDecs.forEach((d, i) => { decodeTo(d, 0); setTimeout(() => decodeIn(d), 260 + i * 70); });   // each link decodes out of the binary as it rises
+      setTimeout(() => menu.querySelector('a').focus({ preventScroll: true }), 420);
+    } else if (focusBack) menuBtn.focus({ preventScroll: true });
+  }
+  menuBtn.addEventListener('click', () => setMenu(!root.classList.contains('menu-open'), true));
+  menu.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false, false); });   // the link's own jump runs after the page unlocks
+  addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('menu-open')) setMenu(false, true); });
+  matchMedia('(max-width: 720px)').addEventListener('change', e => { if (!e.matches && root.classList.contains('menu-open')) setMenu(false, false); });
 
   document.addEventListener('visibilitychange', () => { document.body.classList.toggle('paused', document.hidden); if (!document.hidden && scrubOn) applyWarp(shown); syncField(); });
 
