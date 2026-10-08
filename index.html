@@ -79,8 +79,8 @@ nav.top{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;d
 .poster,.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .poster{background:#0A0805 center/cover no-repeat}
 .stage video{opacity:0;transition:opacity .8s var(--ease);will-change:transform;transform:translateZ(0)}
-.stage.video-ready video{opacity:1}
-.stage.video-ready .poster{opacity:0;transition:opacity .3s 1s}   /* gone once the video has faded in, so the door never ghosts through later */
+.stage.video-painted video{opacity:1}
+.stage.video-painted .poster{opacity:0;transition:opacity .3s 1s}   /* only once a real frame is on screen: never black, and the door never ghosts through later */
 .stage.video-failed video{display:none}
 .scrim{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 120% 90% at 60% 45%,rgba(10,8,5,0) 35%,rgba(10,8,5,.6) 100%),linear-gradient(to bottom,rgba(10,8,5,.45),transparent 22%)}
 .bands{position:absolute;inset:0;pointer-events:none}
@@ -862,7 +862,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   let lastClear = -1;
   function applyWarp(p) {
     const op = Math.round(smoothstep(p, W_ON, 0.9) * (1 - smoothstep(p, 0.955, 0.985)) * 1000) / 1000;
-    if (op !== lastWarpOp) { lastWarpOp = op; warp.style.opacity = op; video.style.opacity = stage.classList.contains('video-ready') ? 1 - smoothstep(p, W_ON, 0.9) : ''; }
+    if (op !== lastWarpOp) { lastWarpOp = op; warp.style.opacity = op; video.style.opacity = stage.classList.contains('video-painted') ? 1 - smoothstep(p, W_ON, 0.9) : ''; }
     // the last stretch: the room's black lifts and the warp settles into the page's binary field
     const clr = Math.round(smoothstep(p, 0.985, 1) * 1000) / 1000;
     if (clr !== lastClear) { lastClear = clr; stage.style.backgroundColor = `rgba(10,8,5,${1 - clr})`; fieldWanted(clr > 0); }
@@ -974,8 +974,23 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     ring.style.setProperty('--ld', 0);
     video.src = URL.createObjectURL(new Blob(chunks, { type: 'video/mp4' }));
     video.load();
-    video.addEventListener('canplay', () => { requestSeek(heroProgress() * (video.duration - 0.04)); stage.classList.add('video-ready'); cueLabel.textContent = 'Scroll to open'; }, { once: true });
+    video.addEventListener('canplay', () => { stage.classList.add('video-ready'); cueLabel.textContent = 'Scroll to open'; primeVideo(); }, { once: true });
   }
+  // iPhone Safari never draws a seeked frame of a video that has not played, so play a beat, pause, then seek.
+  // The poster stays up until a real frame is confirmed on screen.
+  function markPainted() { if (stage.classList.contains('video-painted')) return; stage.classList.add('video-painted'); lastWarpOp = -1; applyWarp(shown); }
+  function primeVideo() {
+    if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(markPainted);
+    else video.addEventListener('seeked', markPainted, { once: true });
+    const seekHere = () => { seekBusy = false; pendingTime = null; requestSeek(shown * (video.duration - 0.04)); };
+    const pr = video.play();
+    if (pr && pr.then) pr.then(() => { video.pause(); seekHere(); }, seekHere); else { video.pause(); seekHere(); }
+  }
+  // Low Power Mode blocks the silent play above; a touch is a user gesture, so retry on touch until a frame shows
+  addEventListener('touchstart', function retry() {
+    if (stage.classList.contains('video-painted')) { removeEventListener('touchstart', retry); return; }
+    if (video.duration) primeVideo();
+  }, { passive: true });
   function initHeroOnce() {
     if (inited) return; inited = true;
     poster.style.backgroundImage = `url('${POSTER_URL}')`;
@@ -1130,7 +1145,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
   addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('menu-open')) setMenu(false, true); });
   matchMedia('(max-width: 720px)').addEventListener('change', e => { if (!e.matches && root.classList.contains('menu-open')) setMenu(false, false); });
 
-  document.addEventListener('visibilitychange', () => { document.body.classList.toggle('paused', document.hidden); if (!document.hidden && scrubOn) applyWarp(shown); syncField(); });
+  document.addEventListener('visibilitychange', () => { document.body.classList.toggle('paused', document.hidden); if (!document.hidden && scrubOn) { applyWarp(shown); if (video.duration) primeVideo(); } syncField(); });   // Safari can drop the decoded frame while the tab is hidden
 
   applyHeroMode();
   if (reduced.matches) pinToFinalStates();
