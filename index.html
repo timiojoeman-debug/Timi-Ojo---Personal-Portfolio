@@ -240,8 +240,8 @@ main section{position:relative;padding:clamp(96px,13vw,170px) clamp(16px,5vw,64p
 .pipeline::before{content:"";position:absolute;left:12.5%;right:12.5%;top:23px;height:1px;background:var(--line)}
 .pipeline .fill{position:absolute;left:12.5%;top:23px;height:1px;width:75%;background:var(--accent);transform-origin:left;transform:scaleX(var(--p,0));box-shadow:0 0 18px rgba(216,178,90,.7)}
 .step{display:flex;flex-direction:column;align-items:center;gap:14px;position:relative;z-index:1}
-.step .node{width:47px;height:47px;border-radius:50%;border:1px solid var(--line);background:var(--canvas);display:grid;place-items:center;font:500 12px/1 var(--mono);color:var(--text-2);transition:border-color .5s var(--ease),color .5s var(--ease),background .5s var(--ease),box-shadow .5s var(--ease)}
-.step .node svg{width:18px;height:18px;opacity:0;position:absolute;transition:opacity .4s var(--ease)}
+.step .node{position:relative;width:47px;height:47px;border-radius:50%;border:1px solid var(--line);background:var(--canvas);display:grid;place-items:center;font:500 12px/1 var(--mono);color:var(--text-2);transition:border-color .5s var(--ease),color .5s var(--ease),background .5s var(--ease),box-shadow .5s var(--ease)}
+.step .node svg{width:18px;height:18px;opacity:0;position:absolute;inset:0;margin:auto;transition:opacity .4s var(--ease)}
 .step .node b{transition:opacity .3s var(--ease);font-weight:500}
 .step span{font:500 14px/1.3 var(--body);color:var(--text-2);transition:color .5s var(--ease)}
 .step.ok .node{border-color:var(--accent);color:var(--accent);background:linear-gradient(rgba(216,178,90,.1),rgba(216,178,90,.1)),var(--canvas);box-shadow:0 0 30px -6px rgba(216,178,90,.6)}
@@ -342,6 +342,8 @@ html.static .static-hero .row{display:flex;flex-wrap:wrap;gap:12px;margin-top:28
   .nav-links{display:none}
   nav.top{top:0;left:0;right:0;transform:none;width:auto;max-width:none;justify-content:space-between;padding:14px 16px;border:0;border-radius:0;background:linear-gradient(rgba(10,8,5,.82),rgba(10,8,5,0));backdrop-filter:none;-webkit-backdrop-filter:none}
   nav.top .btn-gold{display:none}
+  nav.top{transition:background .4s var(--ease),border-color .4s var(--ease)}
+  .past-hero nav.top{background:rgba(10,8,5,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}   /* solid once the film is gone, so page text never runs under the name */
   .menu-btn{display:grid;place-items:center;position:relative;width:46px;height:46px;border-radius:50%;border:1px solid var(--line-strong);background:rgba(14,11,7,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);cursor:pointer}
   .menu-btn i{position:absolute;width:18px;height:1.5px;border-radius:2px;background:var(--accent);transition:transform .5s var(--ease)}
   .menu-btn i:first-child{transform:translateY(-4px)}
@@ -943,7 +945,7 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
     target = heroProgress();
     if (rafId === null && heroOnScreen && scrubOn) rafId = requestAnimationFrame(tick);
   }
-  new IntersectionObserver(([e]) => { heroOnScreen = e.isIntersecting; if (heroOnScreen) onScroll(); syncField(); }).observe(hero);
+  new IntersectionObserver(([e]) => { heroOnScreen = e.isIntersecting; root.classList.toggle('past-hero', !heroOnScreen); if (heroOnScreen) onScroll(); syncField(); }).observe(hero);
   let rsT = null;
   addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { sizeField(); if (!scrubOn) return; sizeWarp(); sizeMark(); }, 150); });
 
