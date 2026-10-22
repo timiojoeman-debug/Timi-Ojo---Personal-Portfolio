@@ -869,7 +869,7 @@ html.og nav.top,html.og .cue{display:none}   /* ?og: clean frame for rendering t
     wctx.fillStyle = core; wctx.fillRect(0, 0, wW, wH);
     warpRaf = requestAnimationFrame(warpFrame);
   }
-  let lastClear = -1, lastVop = null;
+  let lastClear = -1, lastVop = null, lastPosterVis = null;
   function applyWarp(p) {
     const op = Math.round(smoothstep(p, W_ON, 0.9) * (1 - smoothstep(p, 0.955, 0.985)) * 1000) / 1000;
     if (op !== lastWarpOp) { lastWarpOp = op; warp.style.opacity = op; }
@@ -878,6 +878,8 @@ html.og nav.top,html.og .cue{display:none}   /* ?og: clean frame for rendering t
     // the last stretch: the room's black lifts and the warp settles into the page's binary field
     const clr = Math.round(smoothstep(p, 0.985, 1) * 1000) / 1000;
     if (clr !== lastClear) { lastClear = clr; stage.style.backgroundColor = `rgba(10,8,5,${1 - clr})`; fieldWanted(clr > 0); }
+    const pv = p >= W_ON ? 'hidden' : '';
+    if (pv !== lastPosterVis) { lastPosterVis = pv; poster.style.visibility = pv; }   // the door belongs to the start of the film only
     if (p >= W_ON && p <= 0.99 && warpRaf === null && scrubOn && heroOnScreen && !document.hidden) warpRaf = requestAnimationFrame(warpFrame);
   }
 
@@ -1017,13 +1019,13 @@ html.og nav.top,html.og .cue{display:none}   /* ?og: clean frame for rendering t
   // iPhone Safari never draws a seeked frame of a video that has not played, so play a beat, pause, then seek.
   // The poster stays up until a real frame is confirmed on screen.
   function markPainted() { if (stage.classList.contains('video-painted')) return; stage.classList.add('video-painted'); lastVop = null; applyWarp(shown); }
-  let priming = false, primeGen = 0;
+  let priming = false, primeGen = 0, lostChecks = 0;
   function primeVideo() {
     if (FRAMES || priming || !video.duration) return;
     priming = true;
     const gen = ++primeGen, painted = () => { if (gen === primeGen) markPainted(); };
     if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(painted);
-    else video.addEventListener('seeked', painted, { once: true });
+    video.addEventListener('seeked', painted, { once: true });   // also on seeked: an invisible video under the warp gets no frame callbacks
     const seekHere = () => { priming = false; seekBusy = false; pendingTime = null; requestSeek(shown * (video.duration - 0.04)); };
     const pr = video.play();
     if (pr && pr.then) pr.then(() => { video.pause(); seekHere(); }, seekHere); else { video.pause(); seekHere(); }
@@ -1032,7 +1034,8 @@ html.og nav.top,html.og .cue{display:none}   /* ?og: clean frame for rendering t
   setInterval(() => {
     if (FRAMES || !scrubOn || !heroOnScreen || !video.duration || document.hidden) return;
     if (seekBusy && performance.now() - seekAt > 800) { seekBusy = false; const t = pendingTime; pendingTime = null; requestSeek(t !== null ? t : shown * (video.duration - 0.04)); }
-    if (stage.classList.contains('video-painted') && video.readyState < 2) { stage.classList.remove('video-painted'); lastVop = null; applyWarp(shown); primeVideo(); }
+    lostChecks = stage.classList.contains('video-painted') && !video.seeking && video.readyState < 2 ? lostChecks + 1 : 0;   // mid-seek readyState dips are normal, not a lost frame
+    if (lostChecks >= 2) { lostChecks = 0; stage.classList.remove('video-painted'); lastVop = null; applyWarp(shown); primeVideo(); }
   }, 500);
 
   /* ---------- touch devices: a frame sequence on a canvas ---------- */
@@ -1147,7 +1150,7 @@ html.og nav.top,html.og .cue{display:none}   /* ?og: clean frame for rendering t
     initHeroOnce();
     addEventListener('scroll', onScroll, { passive: true });
     bands.forEach(b => { b.op = -1; b.k = -1; });
-    lastM = lastWarpOp = lastClear = -1; lastVop = null;
+    lastM = lastWarpOp = lastClear = -1; lastVop = lastPosterVis = null;
     unpinFinalStates();
     sizeWarp(); sizeMark();
     shown = target = heroProgress();
